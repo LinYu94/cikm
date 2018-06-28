@@ -26,4 +26,8 @@ class Config(object):
 
         self.max_seq_length = 60
         self.validation_ratio = 0.1
+
+        # Test
+        self.AnwserFile = './data/answerFile_0628.txt'
+        self.TestFile = './data/cikm_test_a_20180516.txt'
         

@@ -12,7 +12,7 @@ from sklearn.utils import shuffle
 import keras
 import tensorflow as tf
 from keras.models import Model, Sequential
-from keras.layers import Input, Embedding, LSTM, GRU, Conv1D, Conv2D, GlobalMaxPool1D, Dense, Dropout
+from keras.layers import Input, Embedding, LSTM, GRU, Conv1D, Conv2D, GlobalMaxPool1D, Dense, Dropout, Bidirectional
 
 from util import LoadTrainData2, LoadPretrainedEmbeddings, make_DataEmbeddingIndex
 from util import split_and_zero_padding
@@ -97,7 +97,7 @@ x.add(Embedding(len(embeddings), embedding_dim,
 # x.add(Dropout(0.3))
 # x.add(Dense(1, activation='sigmoid'))
 # LSTM
-x.add(LSTM(config.n_hidden))
+x.add(Bidirectional(LSTM(config.n_hidden)))
 
 shared_model = x
 

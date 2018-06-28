@@ -1,0 +1,29 @@
+
+
+class Config(object):
+    '''configuration'''
+    def __init__(self):
+        
+        # self.basePath = 'E:/kaggle/CIKM AnalytiCup 2018/CIKM/data'
+
+        self.es_TrainFile = './data/cikm_spanish_train_20180516.txt'
+        self.es_embedding_wordFile = './data/wiki.es.vec_word'
+        self.es_embedding_vecFile = './data/wiki.es.vec_vec'
+        
+
+        self.en_TrainFile = './data/cikm_english_train_20180516.txt'
+        self.en_embedding_wordFile = './data/wiki.en.vec_word'
+        self.en_embedding_vecFile = './data/wiki.en.vec_vec'
+
+        # Model variables
+        self.n_epoch = 50
+        self.n_hidden = 50
+        self.gpus = 1
+        self.batch_size = 1024 * self.gpus
+
+        self.modelPath = './data/SiameseLSTM_0628.h5'
+        self.figurePath = './data/history-grap-0628.png'
+
+        self.max_seq_length = 60
+        self.validation_ratio = 0.1
+        

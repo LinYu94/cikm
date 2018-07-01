@@ -97,7 +97,7 @@ x.add(Embedding(len(embeddings), embedding_dim,
 # x.add(Dropout(0.3))
 # x.add(Dense(1, activation='sigmoid'))
 # LSTM
-x.add(Bidirectional(LSTM(config.n_hidden)))
+x.add(Bidirectional(LSTM(config.n_hidden, dropout=0.5, recurrent_dropout=0.2)))
 
 shared_model = x
 

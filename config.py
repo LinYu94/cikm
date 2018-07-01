@@ -19,15 +19,17 @@ class Config(object):
         self.n_epoch = 50
         self.n_hidden = 50
         self.gpus = 1
-        self.batch_size = 1024 * self.gpus
+        self.batch_size = 256 * self.gpus
 
         self.modelPath = './data/SiameseLSTM_0628.h5'
         self.figurePath = './data/history-grap-0628.png'
 
         self.max_seq_length = 60
-        self.validation_ratio = 0.1
+        self.validation_ratio = 0.3
 
         # Test
         self.AnwserFile = './data/answerFile_0628.txt'
         self.TestFile = './data/cikm_test_a_20180516.txt'
+
+        self.lr = 0.001
         

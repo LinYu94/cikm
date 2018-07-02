@@ -32,4 +32,5 @@ class Config(object):
         self.TestFile = './data/cikm_test_a_20180516.txt'
 
         self.lr = 0.001
+        self.dropout_rate = 0.1
         

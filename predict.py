@@ -33,7 +33,8 @@ assert X_test['left'].shape == X_test['right'].shape
 
 # --
 
-model = keras.models.load_model(config.modelPath, custom_objects={'ManDist': ManDist})
+# model = keras.models.load_model(config.modelPath, custom_objects={'ManDist': ManDist})
+model = keras.models.load_model(config.modelForPredict)
 model.summary()
 print(type(X_test['left']))
 print(X_test['left'].shape)

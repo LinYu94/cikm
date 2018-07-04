@@ -13,6 +13,8 @@ import keras
 import tensorflow as tf
 from keras.models import Model, Sequential
 from keras.layers import Input, Embedding, LSTM, GRU, Conv1D, Conv2D, GlobalMaxPool1D, Dense, Dropout, Bidirectional
+from keras.layers import BatchNormalization
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from util import LoadTrainData2, LoadPretrainedEmbeddings, make_DataEmbeddingIndex
 from util import split_and_zero_padding
@@ -85,7 +87,7 @@ assert X_train['left'].shape == X_train['right'].shape
 assert len(X_train['left']) == len(Y_train)
 
 # --
-
+DSSM_DIM = 25
 # Define the shared model
 x = Sequential()
 x.add(Embedding(len(embeddings), embedding_dim,
@@ -97,14 +99,19 @@ x.add(Embedding(len(embeddings), embedding_dim,
 # x.add(Dropout(0.3))
 # x.add(Dense(1, activation='sigmoid'))
 # LSTM
-x.add(Bidirectional(LSTM(embedding_dim, 
-                        dropout=config.dropout_rate, 
-                        recurrent_dropout=config.dropout_rate,
-                        return_sequences=True)))
-
-x.add(Bidirectional(LSTM(config.n_hidden, 
+x.add(Bidirectional(LSTM(config.n_hidden,
                         dropout=config.dropout_rate, 
                         recurrent_dropout=config.dropout_rate)))
+
+x.add(Dense(DSSM_DIM, activation='relu'))
+x.add(BatchNormalization())
+
+x.add(Dense(DSSM_DIM, activation='tanh'))
+x.add(BatchNormalization())
+
+# x.add(Bidirectional(LSTM(config.n_hidden, 
+#                         dropout=config.dropout_rate, 
+#                         recurrent_dropout=config.dropout_rate)))
 
 shared_model = x
 
@@ -113,13 +120,20 @@ left_input = Input(shape=(config.max_seq_length,), dtype='int32')
 right_input = Input(shape=(config.max_seq_length,), dtype='int32')
 
 # Pack it all up into a Manhattan Distance model
-malstm_distance = ManDist()([shared_model(left_input), shared_model(right_input)])
-model = Model(inputs=[left_input, right_input], outputs=[malstm_distance])
+# malstm_distance = ManDist()([shared_model(left_input), shared_model(right_input)])
 
+concatenated = keras.layers.concatenate([shared_model(left_input), shared_model(right_input)])
+out = Dense(1, activation='sigmoid')(concatenated)
+
+# model = Model(inputs=[left_input, right_input], outputs=[malstm_distance])
+model = Model(inputs=[left_input, right_input], outputs=out)
 
 # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
 if config.gpus >= 2:
     model = tf.keras.utils.multi_gpu_model(model, gpus=config.gpus)
+
+early_stopping = EarlyStopping(monitor='val_loss', patience=5)
+model_checkpoint = ModelCheckpoint(config.bst_model_path, save_best_only=True)
 
 model.compile(loss='binary_crossentropy', optimizer=keras.optimizers.Adam(), metrics=['accuracy'])
 model.summary()
@@ -128,8 +142,9 @@ shared_model.summary()
 # Start trainings
 training_start_time = time()
 malstm_trained = model.fit([X_train['left'], X_train['right']], Y_train,
-                           batch_size=config.batch_size, epochs=config.n_epoch,
-                           validation_data=([X_validation['left'], X_validation['right']], Y_validation))
+                           batch_size=config.batch_size, epochs=config.n_epoch, shuffle=True,
+                           validation_data=([X_validation['left'], X_validation['right']], Y_validation),
+                           callbacks=[early_stopping, model_checkpoint])
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2f" % (config.n_epoch,
                                                         training_end_time - training_start_time))

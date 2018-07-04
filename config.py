@@ -22,6 +22,8 @@ class Config(object):
         self.batch_size = 256 * self.gpus
 
         self.modelPath = './data/SiameseLSTM_0628.h5'
+        self.bst_model_path = './data/best_0704.h5'
+        self.modelForPredict = self.bst_model_path
         self.figurePath = './data/history-grap-0628.png'
 
         self.max_seq_length = 60
@@ -33,4 +35,5 @@ class Config(object):
 
         self.lr = 0.001
         self.dropout_rate = 0.1
+        
         

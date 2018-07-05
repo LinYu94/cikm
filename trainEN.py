@@ -25,32 +25,36 @@ import gc
 
 config = Config()
 
+
+
 # Load Pretrained WordEmbeddings
-word_to_ix, embeddings, embedding_dim = LoadPretrainedEmbeddings(config.es_embedding_wordFile, config.es_embedding_vecFile)
+word_to_ix, embeddings, embedding_dim = LoadPretrainedEmbeddings(config.en_embedding_wordFile, config.en_embedding_vecFile)
 
 # Load training set1
 train_df1 = LoadTrainData2(config.es_TrainFile)
 train_df1.columns = ['es1', 'en1', 'es2', 'en2', 'sim']
-for q in ['es1', 'es2']:
+for q in ['en1', 'en2']:
     train_df1[q + '_n'] = train_df1[q]
 
 # Load training set2(en traslation)
 train_df2 = LoadTrainData2(config.en_TrainFile)
 train_df2.columns = ['en1', 'es1', 'en2', 'es2', 'sim']
-for q in ['es1', 'es2']:
+for q in ['en1', 'en2']:
     train_df2[q + '_n'] = train_df2[q]
 
+# Stopwords
+stops = set(stopwords.words('english'))
 
 # Make trainData embeddings index
-train_df1, max_seq_length = make_DataEmbeddingIndex(train_df1, word_to_ix, embeddings)
+train_df1, max_seq_length = make_DataEmbeddingIndex(train_df1, word_to_ix, embeddings, stops, columns=['en1', 'en2'])
 print('train data1 max_seq_length: ', max_seq_length)
 
-train_df2, max_seq_length = make_DataEmbeddingIndex(train_df2, word_to_ix, embeddings)
+train_df2, max_seq_length = make_DataEmbeddingIndex(train_df2, word_to_ix, embeddings, stops, columns=['en1', 'en2'] )
 print('train data2 max_seq_length: ', max_seq_length)
 
 
-train_df1 = train_df1[['es1_n', 'es2_n', 'sim']]
-train_df2 = train_df2[['es1_n', 'es2_n', 'sim']]
+train_df1 = train_df1[['en1_n', 'en2_n', 'sim']]
+train_df2 = train_df2[['en1_n', 'en2_n', 'sim']]
 
 # gc.collect()
 train_df = pd.concat((train_df1, train_df2))
@@ -58,6 +62,7 @@ train_df = pd.concat((train_df1, train_df2))
 # after construct train df, garbage clean
 print('embedding_dim: ', embedding_dim)
 print('vocab size +1: ', len(embeddings))
+print('train data size: ', len(train_df))
 
 
 # shuffle train data 
@@ -67,35 +72,34 @@ train_df = shuffle(train_df)
 validation_size = int(len(train_df) * config.validation_ratio)
 training_size = len(train_df) - validation_size
 
-X = train_df[['es1_n', 'es2_n']]
+X = train_df[['en1_n', 'en2_n']]
 Y = train_df['sim']
-
 X_train, X_validation, Y_train, Y_validation = train_test_split(X, Y, test_size=validation_size)
 
-X_train = split_and_zero_padding(X_train, config.max_seq_length)
-X_validation = split_and_zero_padding(X_validation, config.max_seq_length)
+# Padding Zero
+X_train = split_and_zero_padding_en(X_train, config.en_max_seq_length)
+X_validation = split_and_zero_padding_en(X_validation, config.en_max_seq_length)
 
-# Convert labels to their numpy representations
-Y_train = Y_train.values
-Y_validation = Y_validation.values
 
-# Make sure everything is ok
-assert X_train['left'].shape == X_train['right'].shape
-assert len(X_train['left']) == len(Y_train)
+model = BuildENModel(embeddings, embedding_dim)
 
-model = BuildModel()
+# Save best, Early Stop
+early_stopping = EarlyStopping(monitor='val_loss', patience=5)
+model_checkpoint = ModelCheckpoint(config.en_bst_model_path, monitor='val_loss', save_best_only=True)
 
 # Start trainings
 training_start_time = time()
 malstm_trained = model.fit([X_train['left'], X_train['right']], Y_train,
-                           batch_size=config.batch_size, epochs=config.n_epoch, shuffle=True,
+                           batch_size=config.batch_size, 
+                           epochs=config.n_epoch, 
+                           shuffle=True,
                            validation_data=([X_validation['left'], X_validation['right']], Y_validation),
-                           callbacks=[early_stopping, model_checkpoint])
+                           callbacks=[model_checkpoint]) # here do not early stop
 training_end_time = time()
-print("Training time finished.\n%d epochs in %12.2f" % (config.n_epoch,
+print("Training time finished.\n%d epochs in %12.2fs" % (config.n_epoch,
                                                         training_end_time - training_start_time))
 
-model.save(config.modelPath)
+model.save(config.en_modelPath)
 
 # Plot accuracy
 plt.subplot(211)
@@ -116,7 +120,7 @@ plt.xlabel('Epoch')
 plt.legend(['Train', 'Validation'], loc='upper right')
 
 plt.tight_layout(h_pad=1.0)
-plt.savefig(config.figurePath)
+plt.savefig(config.en_figurePath)
 
 print(str(malstm_trained.history['val_acc'][-1])[:6] +
       "(max: " + str(max(malstm_trained.history['val_acc']))[:6] + ")")

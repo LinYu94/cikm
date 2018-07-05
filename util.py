@@ -6,7 +6,8 @@ from keras.preprocessing.sequence import pad_sequences
 
 from nltk.corpus import stopwords
 from gensim.models import KeyedVectors
-
+import tensorflow as tf
+from config import Config
 import gensim
 
 import numpy as np
@@ -14,6 +15,88 @@ import numpy as np
 import itertools
 
 import pandas as pd
+
+def BuildESModel():
+    # --
+    # Define the shared model
+    x = Sequential()
+    x.add(Embedding(len(embeddings), embedding_dim,
+                    weights=[embeddings], input_shape=(config.max_seq_length,), trainable=False))
+    # CNN
+    # x.add(Conv1D(250, kernel_size=5, activation='relu'))
+    # x.add(GlobalMaxPool1D())
+    # x.add(Dense(250, activation='relu'))
+    # x.add(Dropout(0.3))
+    # x.add(Dense(1, activation='sigmoid'))
+    # LSTM
+    x.add(Bidirectional(LSTM(config.n_hidden,
+                            dropout=config.dropout_rate, 
+                            recurrent_dropout=config.dropout_rate)))
+
+    # x.add(Bidirectional(LSTM(config.n_hidden, 
+    #                         dropout=config.dropout_rate, 
+    #                         recurrent_dropout=config.dropout_rate)))
+
+    shared_model = x
+
+    # The visible layer
+    left_input = Input(shape=(config.max_seq_length,), dtype='int32')
+    right_input = Input(shape=(config.max_seq_length,), dtype='int32')
+
+    # Pack it all up into a Manhattan Distance model
+    # malstm_distance = ManDist()([shared_model(left_input), shared_model(right_input)])
+
+    concatenated = keras.layers.concatenate([shared_model(left_input), shared_model(right_input)])
+    out = Dense(1, activation='sigmoid')(concatenated)
+
+    # model = Model(inputs=[left_input, right_input], outputs=[malstm_distance])
+    model = Model(inputs=[left_input, right_input], outputs=out)
+
+    # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
+    if config.gpus >= 2:
+        model = keras.utils.multi_gpu_model(model, gpus=config.gpus)
+
+    early_stopping = EarlyStopping(monitor='val_loss', patience=5)
+    model_checkpoint = ModelCheckpoint(config.bst_model_path, save_best_only=True)
+
+    model.compile(loss='binary_crossentropy', optimizer=keras.optimizers.Adam(), metrics=['accuracy'])
+    model.summary()
+    shared_model.summary()
+
+
+def BuildENModel(embeddings, embedding_dim):
+    # --
+    # Define the shared model
+    x = Sequential()
+    x.add(Embedding(len(embeddings), embedding_dim,
+                    weights=[embeddings], input_shape=(config.en_max_seq_length,), trainable=False))
+
+    # LSTM
+    x.add(Bidirectional(LSTM(config.n_hidden,
+                            dropout=config.dropout_rate, 
+                            recurrent_dropout=config.dropout_rate)))
+
+    shared_model = x
+    # The visible layer
+    left_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
+    right_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
+
+    # Pack it all up into a Manhattan Distance model
+    malstm_distance = ManDist()([shared_model(left_input), shared_model(right_input)])
+
+    model = Model(inputs=[left_input, right_input], outputs=[malstm_distance])
+
+    # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
+    if config.gpus >= 2:
+        model = keras.utils.multi_gpu_model(model, gpus=config.gpus)
+
+
+
+    model.compile(loss='binary_crossentropy', optimizer=keras.optimizers.Adam(), metrics=['accuracy'])
+    model.summary()
+    shared_model.summary()
+
+
 
 def LoadTrainData(fileName):
     df = pd.read_csv(fileName, sep='\t', header=None)
@@ -71,12 +154,11 @@ def LoadPretrainedEmbeddings(wordFile, vecFile):
     return word_to_ix, embeddings, embedding_dim
     
 
-def make_DataEmbeddingIndex(df, word_to_ix, embeddings):
+def make_DataEmbeddingIndex(df, word_to_ix, embeddings, stops, columns):
     vocabs_not_w2v = set()
     vocabs_not_w2v_cnt = 0
     max_seq_length = -1
-    # Stopwords
-    stops = set(stopwords.words('spanish'))
+    
     # gen word Index
     for index, row in df.iterrows():
         # Print the number of embedded sentences.
@@ -84,7 +166,7 @@ def make_DataEmbeddingIndex(df, word_to_ix, embeddings):
             print("{:,} sentences embedded.".format(index), flush=True)
 
         # Iterate through the text of both questions of the row
-        for sentence in ['es1', 'es2']:
+        for sentence in columns:
             q2n = []  # q2n -> sentence numbers representation
             words = text_to_word_list(row[sentence])
             max_seq_length = max(max_seq_length, len(words))
@@ -92,7 +174,7 @@ def make_DataEmbeddingIndex(df, word_to_ix, embeddings):
                 # Check for unwanted words
                 if word in stops:
                     continue
-
+                    
                 # If a word is missing from word2vec model.
                 if word not in word_to_ix:
                     if word not in vocabs_not_w2v:
@@ -111,15 +193,16 @@ def make_DataEmbeddingIndex(df, word_to_ix, embeddings):
 
 
 def split_and_zero_padding(df, max_seq_length):
-    # Split to dicts
-    X = {'left': df['es1_n'], 'right': df['es2_n']}
-
     # Zero padding
-    for dataset, side in itertools.product([X], ['left', 'right']):
-        dataset[side] = pad_sequences(dataset[side], padding='pre', truncating='post', maxlen=max_seq_length)
+    df['es1_n'] = pad_sequences(df['es1_n'], padding='pre', truncating='post', maxlen=max_seq_length)
+    df['es2_n'] = pad_sequences(df['es2_n'], padding='pre', truncating='post', maxlen=max_seq_length)
+    return df
 
-    return dataset
-
+def split_and_zero_padding_en(df, max_seq_length):
+    # Zero padding
+    df['en1_n'] = pad_sequences(df['en1_n'], padding='pre', truncating='post', maxlen=max_seq_length)
+    df['en2_n'] = pad_sequences(df['en2_n'], padding='pre', truncating='post', maxlen=max_seq_length)
+    return df
 
 #  --
 

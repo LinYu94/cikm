@@ -9,72 +9,88 @@ from gensim.models import KeyedVectors
 import tensorflow as tf
 from config import Config
 import gensim
+import keras
+from keras.models import Model, Sequential
+from keras.layers import Input, Embedding, LSTM, GRU, Conv1D, Conv2D, GlobalMaxPool1D, Dense, Dropout, Bidirectional
+from keras.layers import BatchNormalization
 
 import numpy as np
-
 import itertools
-
 import pandas as pd
 
-def BuildESModel():
+config = Config()
+
+def BuildESModel(embeddings, embedding_dim):
     # --
+    # Load EN model
+    print('Loading EN encoder...: ', config.en_bst_model_path)
+    enModel = keras.models.load_model(config.en_bst_model_path, custom_objects={'ManDist': ManDist})
+    enEncoder = enModel.layers[2]
+    print(enEncoder)
+    for layer in enEncoder.layers:
+        layer.trainable = False
+    
+    print(enEncoder.summary())
+
     # Define the shared model
     x = Sequential()
     x.add(Embedding(len(embeddings), embedding_dim,
-                    weights=[embeddings], input_shape=(config.max_seq_length,), trainable=False))
-    # CNN
-    # x.add(Conv1D(250, kernel_size=5, activation='relu'))
-    # x.add(GlobalMaxPool1D())
-    # x.add(Dense(250, activation='relu'))
-    # x.add(Dropout(0.3))
-    # x.add(Dense(1, activation='sigmoid'))
+                    weights=[embeddings], 
+                    input_shape=(config.es_max_seq_length,),
+                    trainable=False))
+    
     # LSTM
     x.add(Bidirectional(LSTM(config.n_hidden,
                             dropout=config.dropout_rate, 
-                            recurrent_dropout=config.dropout_rate)))
+                            recurrent_dropout=config.dropout_rate), name='es_encoder'))
 
     # x.add(Bidirectional(LSTM(config.n_hidden, 
     #                         dropout=config.dropout_rate, 
     #                         recurrent_dropout=config.dropout_rate)))
-
     shared_model = x
 
     # The visible layer
-    left_input = Input(shape=(config.max_seq_length,), dtype='int32')
-    right_input = Input(shape=(config.max_seq_length,), dtype='int32')
+    en_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
+
+    es_left_input = Input(shape=(config.es_max_seq_length,), dtype='int32')
+    es_right_input = Input(shape=(config.es_max_seq_length,), dtype='int32')
 
     # Pack it all up into a Manhattan Distance model
     # malstm_distance = ManDist()([shared_model(left_input), shared_model(right_input)])
 
-    concatenated = keras.layers.concatenate([shared_model(left_input), shared_model(right_input)])
-    out = Dense(1, activation='sigmoid')(concatenated)
+    ss_malstm_distance = ManDist()([shared_model(es_left_input), shared_model(es_right_input)])
+    sn1_malstm_distance = ManDist()([shared_model(es_left_input), enEncoder(en_input)])
+    sn2_malstm_distance = ManDist()([shared_model(es_right_input), enEncoder(en_input)])
 
-    # model = Model(inputs=[left_input, right_input], outputs=[malstm_distance])
-    model = Model(inputs=[left_input, right_input], outputs=out)
+    model = Model(inputs=[es_left_input, es_right_input, en_input], 
+                outputs=[ss_malstm_distance, sn1_malstm_distance, sn2_malstm_distance])
 
     # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
     if config.gpus >= 2:
         model = keras.utils.multi_gpu_model(model, gpus=config.gpus)
 
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5)
-    model_checkpoint = ModelCheckpoint(config.bst_model_path, save_best_only=True)
-
-    model.compile(loss='binary_crossentropy', optimizer=keras.optimizers.Adam(), metrics=['accuracy'])
-    model.summary()
+    model.compile(loss='binary_crossentropy', 
+                  optimizer=keras.optimizers.Adam(),
+                  loss_weights=[1, 0.2, 0.2],
+                  metrics=['accuracy'])
+    print(model.summary())
     shared_model.summary()
-
+    return model
 
 def BuildENModel(embeddings, embedding_dim):
     # --
     # Define the shared model
     x = Sequential()
-    x.add(Embedding(len(embeddings), embedding_dim,
-                    weights=[embeddings], input_shape=(config.en_max_seq_length,), trainable=False))
+    x.add(Embedding(len(embeddings), 
+                    embedding_dim,
+                    weights=[embeddings], 
+                    input_shape=(config.en_max_seq_length,), 
+                    trainable=False))
 
     # LSTM
     x.add(Bidirectional(LSTM(config.n_hidden,
                             dropout=config.dropout_rate, 
-                            recurrent_dropout=config.dropout_rate)))
+                            recurrent_dropout=config.dropout_rate), name='en_encoder'))
 
     shared_model = x
     # The visible layer
@@ -84,38 +100,25 @@ def BuildENModel(embeddings, embedding_dim):
     # Pack it all up into a Manhattan Distance model
     malstm_distance = ManDist()([shared_model(left_input), shared_model(right_input)])
 
-    model = Model(inputs=[left_input, right_input], outputs=[malstm_distance])
+    model = Model(inputs=[left_input, right_input], 
+                outputs=[malstm_distance])
 
     # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
     if config.gpus >= 2:
         model = keras.utils.multi_gpu_model(model, gpus=config.gpus)
 
+    model.compile(loss='binary_crossentropy', 
+                optimizer=keras.optimizers.Adam(), 
+                metrics=['accuracy'])
 
-
-    model.compile(loss='binary_crossentropy', optimizer=keras.optimizers.Adam(), metrics=['accuracy'])
-    model.summary()
+    print(model.summary())
     shared_model.summary()
+    return model
 
-
-
-def LoadTrainData(fileName):
-    df = pd.read_csv(fileName, sep='\t', header=None)
-    df.columns = ['es1', 'en1', 'es2', 'en2', 'sim']
-    data = [[],[]]
-    for i in range(len(df['sim'])):
-        data[0].append((df.iloc[i, 0], df.iloc[i, 2]))
-        data[1].append(df.iloc[i, 4])
-    return data
 
 def LoadTrainData2(fileName):
     df = pd.read_csv(fileName, sep='\t', header=None)
     return df
-
-def LoadTestData(fileName):
-    df = pd.read_csv(fileName, sep='\t', header=None)
-    df.columns = ['es1', 'es2']
-    return df
-
 
 def text_to_word_list(text):
     # Pre process and convert texts to a list of words
@@ -192,17 +195,13 @@ def make_DataEmbeddingIndex(df, word_to_ix, embeddings, stops, columns):
 
 
 
-def split_and_zero_padding(df, max_seq_length):
-    # Zero padding
-    df['es1_n'] = pad_sequences(df['es1_n'], padding='pre', truncating='post', maxlen=max_seq_length)
-    df['es2_n'] = pad_sequences(df['es2_n'], padding='pre', truncating='post', maxlen=max_seq_length)
-    return df
 
-def split_and_zero_padding_en(df, max_seq_length):
+def split_and_zero_padding(df, max_seq_length, columns=None):
+    data = []
     # Zero padding
-    df['en1_n'] = pad_sequences(df['en1_n'], padding='pre', truncating='post', maxlen=max_seq_length)
-    df['en2_n'] = pad_sequences(df['en2_n'], padding='pre', truncating='post', maxlen=max_seq_length)
-    return df
+    for col in columns:
+        data.append(pad_sequences(df[col], padding='pre', truncating='post', maxlen=max_seq_length))
+    return data
 
 #  --
 

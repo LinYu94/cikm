@@ -11,18 +11,12 @@ from sklearn.utils import shuffle
 
 import keras
 import tensorflow as tf
-from keras.models import Model, Sequential
-from keras.layers import Input, Embedding, LSTM, GRU, Conv1D, Conv2D, GlobalMaxPool1D, Dense, Dropout, Bidirectional
-from keras.layers import BatchNormalization
 from keras.callbacks import EarlyStopping, ModelCheckpoint
-
-from util import LoadTrainData2, LoadPretrainedEmbeddings, make_DataEmbeddingIndex
-from util import split_and_zero_padding
-from util import ManDist
+from util import *
 from config import Config
 
 import gc
-
+from nltk.corpus import stopwords
 config = Config()
 
 
@@ -77,8 +71,8 @@ Y = train_df['sim']
 X_train, X_validation, Y_train, Y_validation = train_test_split(X, Y, test_size=validation_size)
 
 # Padding Zero
-X_train = split_and_zero_padding_en(X_train, config.en_max_seq_length)
-X_validation = split_and_zero_padding_en(X_validation, config.en_max_seq_length)
+X_train = split_and_zero_padding(X_train, config.en_max_seq_length, ['en1_n', 'en2_n'])
+X_validation = split_and_zero_padding(X_validation, config.en_max_seq_length, ['en1_n', 'en2_n'])
 
 
 model = BuildENModel(embeddings, embedding_dim)
@@ -87,13 +81,14 @@ model = BuildENModel(embeddings, embedding_dim)
 early_stopping = EarlyStopping(monitor='val_loss', patience=5)
 model_checkpoint = ModelCheckpoint(config.en_bst_model_path, monitor='val_loss', save_best_only=True)
 
+
 # Start trainings
 training_start_time = time()
-malstm_trained = model.fit([X_train['left'], X_train['right']], Y_train,
+malstm_trained = model.fit(X_train, Y_train,
                            batch_size=config.batch_size, 
                            epochs=config.n_epoch, 
-                           shuffle=True,
-                           validation_data=([X_validation['left'], X_validation['right']], Y_validation),
+                        #    shuffle=True,
+                           validation_data=(X_validation, Y_validation),
                            callbacks=[model_checkpoint]) # here do not early stop
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2fs" % (config.n_epoch,
@@ -101,27 +96,27 @@ print("Training time finished.\n%d epochs in %12.2fs" % (config.n_epoch,
 
 model.save(config.en_modelPath)
 
-# Plot accuracy
-plt.subplot(211)
-plt.plot(malstm_trained.history['acc'])
-plt.plot(malstm_trained.history['val_acc'])
-plt.title('Model Accuracy')
-plt.ylabel('Accuracy')
-plt.xlabel('Epoch')
-plt.legend(['Train', 'Validation'], loc='upper left')
+# # Plot accuracy
+# plt.subplot(211)
+# plt.plot(malstm_trained.history['acc'])
+# plt.plot(malstm_trained.history['val_acc'])
+# plt.title('Model Accuracy')
+# plt.ylabel('Accuracy')
+# plt.xlabel('Epoch')
+# plt.legend(['Train', 'Validation'], loc='upper left')
 
-# Plot loss
-plt.subplot(212)
-plt.plot(malstm_trained.history['loss'])
-plt.plot(malstm_trained.history['val_loss'])
-plt.title('Model Loss')
-plt.ylabel('Loss')
-plt.xlabel('Epoch')
-plt.legend(['Train', 'Validation'], loc='upper right')
+# # Plot loss
+# plt.subplot(212)
+# plt.plot(malstm_trained.history['loss'])
+# plt.plot(malstm_trained.history['val_loss'])
+# plt.title('Model Loss')
+# plt.ylabel('Loss')
+# plt.xlabel('Epoch')
+# plt.legend(['Train', 'Validation'], loc='upper right')
 
-plt.tight_layout(h_pad=1.0)
-plt.savefig(config.en_figurePath)
+# plt.tight_layout(h_pad=1.0)
+# plt.savefig(config.en_figurePath)
 
-print(str(malstm_trained.history['val_acc'][-1])[:6] +
-      "(max: " + str(max(malstm_trained.history['val_acc']))[:6] + ")")
-print("Done.")
+# print(str(malstm_trained.history['val_acc'][-1])[:6] +
+#       "(max: " + str(max(malstm_trained.history['val_acc']))[:6] + ")")
+# print("Done.")

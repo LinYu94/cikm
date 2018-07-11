@@ -4,8 +4,8 @@ class Config(object):
     '''configuration'''
     def __init__(self):
         
-        self.es_version = '_0706'
-        self.en_version = '_0705'
+        self.es_version = '_0711'
+        self.en_version = '_0711'
         # self.version = '_test1'
         # Train data
         self.es_TrainFile = './data/cikm_spanish_train_20180516.txt'
@@ -17,7 +17,7 @@ class Config(object):
         self.en_embedding_vecFile = './data/wiki.en.vec_vec'
 
         # Model variables
-        self.n_epoch = 50
+        self.n_epoch = 1
         self.n_hidden = 50
         self.gpus = 1
         self.batch_size = 128 * self.gpus
@@ -40,7 +40,7 @@ class Config(object):
         
 
         # Prediction
-        self.modelForPredict = self.es_modelPath
+        self.modelForPredict = self.es_bst_model_path
         self.anwserFile = './data/answerFile' + self.es_version + '.txt'
         self.testFile = './data/cikm_test_a_20180516.txt'
 

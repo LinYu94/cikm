@@ -32,15 +32,18 @@ print(len(X_test))
 print(len(X_test[0]))
 # --
 
-model = keras.models.load_model(config.modelForPredict, custom_objects={'ManDist': ManDist})
+model = keras.models.load_model(config.modelForPredict, custom_objects={'Euclidean': Euclidean})
 model.summary()
 
 
-prediction = model.predict([X_test[0], X_test[1], X_test[0]])
+prediction = model.predict([X_test[0], X_test[1], X_test[0], X_test[0]])
 
 print(type(prediction))
 print(prediction)
 with open(config.anwserFile, 'w') as fw:
     for x in prediction[0]:
         fw.write(str(x[0]) + '\n')
+with open('all', 'w') as fw:
+    for x in prediction:
+        fw.write('\t'.join(x) + '\n')
 print('predict finish!')

@@ -59,6 +59,8 @@ print('vocab size +1: ', len(embeddings))
 print('train data size: ', len(train_df))
 
 
+
+
 # shuffle train data 
 train_df = shuffle(train_df)
 
@@ -75,26 +77,25 @@ X_train = split_and_zero_padding(X_train, config.en_max_seq_length, ['en1_n', 'e
 X_validation = split_and_zero_padding(X_validation, config.en_max_seq_length, ['en1_n', 'en2_n'])
 
 
-model = BuildENModel(embeddings, embedding_dim)
 
 # Save best, Early Stop
 early_stopping = EarlyStopping(monitor='val_loss', patience=5)
 model_checkpoint = ModelCheckpoint(config.en_bst_model_path, monitor='val_loss', save_best_only=True)
 
-
+model = BuildENModel(embeddings, embedding_dim)
 # Start trainings
 training_start_time = time()
 malstm_trained = model.fit(X_train, Y_train,
                            batch_size=config.batch_size, 
                            epochs=config.n_epoch, 
-                        #    shuffle=True,
-                           validation_data=(X_validation, Y_validation),
-                           callbacks=[model_checkpoint]) # here do not early stop
+                           shuffle=True,
+                           verbose=2,
+                        #    callbacks=[model_checkpoint],
+                           validation_data=(X_validation, Y_validation)) # here do not early stop
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2fs" % (config.n_epoch,
                                                         training_end_time - training_start_time))
-
-model.save(config.en_modelPath)
+model.save(config.en_bst_model_path)
 
 # # Plot accuracy
 # plt.subplot(211)

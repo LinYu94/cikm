@@ -23,9 +23,9 @@ import gc
 from nltk.corpus import stopwords
 
 config = Config()
-config.n_epoch = 30
 # Load Pretrained WordEmbeddings
 es_word_to_ix, es_embeddings, es_embedding_dim = LoadPretrainedEmbeddings(config.es_embedding_wordFile, config.es_embedding_vecFile)
+model = BuildESModel(es_embeddings, es_embedding_dim)
 en_word_to_ix, en_embeddings, en_embedding_dim = LoadPretrainedEmbeddings(config.en_embedding_wordFile, config.en_embedding_vecFile)
 
 
@@ -59,6 +59,7 @@ train_df2, max_seq_length = make_DataEmbeddingIndex(train_df2, en_word_to_ix, en
 print('train data2 max_seq_length: ', max_seq_length)
 
 train_df1 = train_df1[['en1_n', 'es1_n', 'en2_n', 'es2_n', 'sim']]
+train_df2 = train_df2[['en1_n', 'es1_n', 'en2_n', 'es2_n', 'sim']]
 train_df = pd.concat((train_df1, train_df2))
 
 # Shuffle train data 
@@ -103,11 +104,9 @@ X_train = split_and_zero_padding(X_train, config.es_max_seq_length, columns=['es
 X_validation = split_and_zero_padding(X_validation, config.es_max_seq_length, columns=['es1_n', 'es2_n', 'en_n'])
 
 
-model = BuildESModel(es_embeddings, es_embedding_dim)
 
-print(type(Y_train))
-print(Y_train.shape)
-print(Y_train[0])
+
+
 
 # Save best, Early Stop
 early_stopping = EarlyStopping(monitor='val_loss', patience=5)
@@ -119,8 +118,9 @@ malstm_trained = model.fit(X_train, [Y_train, Y_train, Y_train],
                            batch_size=config.batch_size, 
                            epochs=config.n_epoch, 
                            shuffle=True,
-                           validation_data=(X_validation, [Y_validation, Y_validation, Y_validation]),
-                           callbacks=[model_checkpoint])
+                           verbose=2,
+                        #    callbacks=[model_checkpoint],
+                           validation_data=(X_validation, [Y_validation, Y_validation, Y_validation]))
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2f" % (config.n_epoch,
                                                         training_end_time - training_start_time))

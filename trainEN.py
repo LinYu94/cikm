@@ -88,14 +88,14 @@ training_start_time = time()
 malstm_trained = model.fit(X_train, Y_train,
                            batch_size=config.batch_size, 
                            epochs=config.n_epoch, 
-                           shuffle=True,
+                           callbacks=[model_checkpoint],
                            verbose=2,
-                        #    callbacks=[model_checkpoint],
+                           shuffle=True,
                            validation_data=(X_validation, Y_validation)) # here do not early stop
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2fs" % (config.n_epoch,
                                                         training_end_time - training_start_time))
-model.save(config.en_bst_model_path)
+
 
 # # Plot accuracy
 # plt.subplot(211)

@@ -25,7 +25,8 @@ from nltk.corpus import stopwords
 config = Config()
 # Load Pretrained WordEmbeddings
 es_word_to_ix, es_embeddings, es_embedding_dim = LoadPretrainedEmbeddings(config.es_embedding_wordFile, config.es_embedding_vecFile)
-model = BuildESModel(es_embeddings, es_embedding_dim)
+model = BuildESModel2(es_embeddings, es_embedding_dim)
+
 en_word_to_ix, en_embeddings, en_embedding_dim = LoadPretrainedEmbeddings(config.en_embedding_wordFile, config.en_embedding_vecFile)
 
 
@@ -69,22 +70,8 @@ train_df = shuffle(train_df)
 validation_size = int(len(train_df) * config.validation_ratio)
 training_size = len(train_df) - validation_size
 
-trainSet = train_df[validation_size:]
-validationSet = train_df[:validation_size]
-
-train_df_1 = trainSet[['es1_n', 'es2_n', 'en1_n', 'sim']]
-train_df_2 = trainSet[['es1_n', 'es2_n', 'en2_n', 'sim']]
-validation_df_1 = validationSet[['es1_n', 'es2_n', 'en1_n', 'sim']]
-validation_df_2 = validationSet[['es1_n', 'es2_n', 'en2_n', 'sim']]
-
-train_df_1.columns = ['es1_n', 'es2_n', 'en_n', 'sim']
-train_df_2.columns = ['es1_n', 'es2_n', 'en_n', 'sim']
-validation_df_1.columns = ['es1_n', 'es2_n', 'en_n', 'sim']
-validation_df_2.columns = ['es1_n', 'es2_n', 'en_n', 'sim']
-
-
-train_df = pd.concat((train_df_1, train_df_2))
-validation_df = pd.concat((validation_df_1, validation_df_2))
+validation_df = train_df[:validation_size]
+train_df = train_df[validation_size:]
 
 # gc.collect()
 
@@ -93,18 +80,15 @@ print('es_embedding_dim: ', es_embedding_dim)
 print('es_vocab size +1: ', len(es_embeddings))
 
 
-X_train = train_df[['es1_n', 'es2_n', 'en_n']]
+X_train = train_df[['es1_n', 'es2_n', 'en1_n', 'en2_n']]
 Y_train = train_df['sim']
-X_validation = validation_df[['es1_n', 'es2_n', 'en_n']]
+X_validation = validation_df[['es1_n', 'es2_n', 'en1_n', 'en2_n']]
 Y_validation = validation_df['sim']
 
 
 # es_max_seq_length == en_max_seq_length == 60
-X_train = split_and_zero_padding(X_train, config.es_max_seq_length, columns=['es1_n', 'es2_n', 'en_n'])
-X_validation = split_and_zero_padding(X_validation, config.es_max_seq_length, columns=['es1_n', 'es2_n', 'en_n'])
-
-
-
+X_train = split_and_zero_padding(X_train, config.es_max_seq_length, columns=['es1_n', 'es2_n', 'en1_n', 'en2_n'])
+X_validation = split_and_zero_padding(X_validation, config.es_max_seq_length, columns=['es1_n', 'es2_n', 'en1_n', 'en2_n'])
 
 
 
@@ -114,20 +98,18 @@ model_checkpoint = ModelCheckpoint(config.es_bst_model_path, monitor='val_loss',
 
 # Start trainings
 training_start_time = time()
-malstm_trained = model.fit(X_train, [Y_train, Y_train, Y_train],
+malstm_trained = model.fit(X_train, [Y_train, Y_train, Y_train, Y_train],
                            batch_size=config.batch_size, 
                            epochs=config.n_epoch, 
                            shuffle=True,
                            verbose=2,
-                        #    callbacks=[model_checkpoint],
-                           validation_data=(X_validation, [Y_validation, Y_validation, Y_validation]))
+                           callbacks=[model_checkpoint],
+                           validation_data=(X_validation, [Y_validation, Y_validation, Y_validation, Y_validation]))
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2f" % (config.n_epoch,
                                                         training_end_time - training_start_time))
 
-model.save(config.es_modelPath)
-
-
+# model.save(config.es_modelPath)
 
 # Plot accuracy
 # plt.subplot(211)

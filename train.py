@@ -98,13 +98,13 @@ model_checkpoint = ModelCheckpoint(config.es_bst_model_path, monitor='val_loss',
 
 # Start trainings
 training_start_time = time()
-malstm_trained = model.fit(X_train, [Y_train, Y_train, Y_train, Y_train],
+malstm_trained = model.fit(X_train, [Y_train, Y_train, Y_train],
                            batch_size=config.batch_size, 
                            epochs=config.n_epoch, 
                            shuffle=True,
                            verbose=2,
                            callbacks=[model_checkpoint],
-                           validation_data=(X_validation, [Y_validation, Y_validation, Y_validation, Y_validation]))
+                           validation_data=(X_validation, [Y_validation, Y_validation, Y_validation]))
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2f" % (config.n_epoch,
                                                         training_end_time - training_start_time))

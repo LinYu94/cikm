@@ -102,7 +102,7 @@ class Attention(Layer):
         if mask is not None:
             # Cast the mask to floatX to avoid float64 upcasting in theano
             a *= K.cast(mask, K.floatx())
-
+        print(a)
         # in some cases especially in the early stages of training the sum may be almost zero
         a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())
 
@@ -114,19 +114,6 @@ class Attention(Layer):
     def compute_output_shape(self, input_shape):
         #return input_shape[0], input_shape[-1]
         return input_shape[0],  self.features_dim
-
-    def get_config(self):
-        config = {'supports_masking': self.supports_masking,
-                    'W_regularizer': self.W_regularizer,
-                    'b_regularizer': self.b_regularizer,
-                    'W_constraint': self.W_constraint,
-                    'b_constraint': self.supports_masking,
-                    'bias': self.bias,
-                    'step_dim': self.step_dim,
-                    'features_dim': self.features_dim
-                    }
-        base_config = super(Attention, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
      
 
 def BuildESModel(embeddings, embedding_dim):
@@ -264,13 +251,14 @@ def BuildENModel(embeddings, embedding_dim):
     # x.add(Dropout(0.2))
     x.add(Attention(config.en_max_seq_length))
     shared_model = x
+    
     # The visible layer
     left_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
     right_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
 
     # Pack it all up into a Manhattan Distance model
-    distance = ManDist()([shared_model(left_input), shared_model(right_input)])
-    # distance = Euclidean()([shared_model(left_input), shared_model(right_input)])
+    # distance = ManDist()([shared_model(left_input), shared_model(right_input)])
+    distance = Euclidean()([shared_model(left_input), shared_model(right_input)])
 
     model = Model(inputs=[left_input, right_input], 
                 outputs=[distance])
@@ -282,9 +270,82 @@ def BuildENModel(embeddings, embedding_dim):
     model.compile(loss='binary_crossentropy', 
                 optimizer=keras.optimizers.Adam(), 
                 metrics=['accuracy'])
+    return model
 
-    model.summary()
-    shared_model.summary()
+def BuildENModel_Test(embeddings, embedding_dim):
+    # --
+    # Define the shared model
+    x = Sequential()
+    x.add(Embedding(len(embeddings), 
+                    embedding_dim,
+                    weights=[embeddings], 
+                    input_shape=(config.en_max_seq_length,), 
+                    trainable=False))
+
+    # LSTM
+    x.add(Bidirectional(LSTM(config.n_hidden,
+                            return_sequences=True), name='en_encoder'))
+    # x.add(Dropout(0.2))
+    x.add(Attention(config.en_max_seq_length))
+    shared_model = x
+    
+    # The visible layer
+    left_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
+    right_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
+
+    # Pack it all up into a Manhattan Distance model
+    # distance = ManDist()([shared_model(left_input), shared_model(right_input)])
+    distance = Euclidean()([shared_model(left_input), shared_model(right_input)])
+
+    model = Model(inputs=[left_input, right_input], 
+                outputs=[distance])
+
+    # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
+    if config.gpus >= 2:
+        model = keras.utils.multi_gpu_model(model, gpus=config.gpus)
+
+    model.compile(loss='binary_crossentropy', 
+                optimizer=keras.optimizers.Adam(), 
+                metrics=['accuracy'])
+    return model
+
+    
+def BuildESModel_baseline(embeddings, embedding_dim):
+    # --
+    # Define the shared model
+    x = Sequential()
+    x.add(Embedding(len(embeddings), 
+                    embedding_dim,
+                    weights=[embeddings], 
+                    input_shape=(config.es_max_seq_length,), 
+                    trainable=False))
+
+    # LSTM
+    x.add(Bidirectional(LSTM(config.n_hidden,
+                            # recurrent_dropout=config.dropout_rate,
+                            # dropout=config.dropout_rate,
+                            return_sequences=True)))
+    # x.add(Dropout(0.2))
+    x.add(Attention(config.es_max_seq_length))
+    shared_model = x
+    # The visible layer
+    left_input = Input(shape=(config.es_max_seq_length,), dtype='int32')
+    right_input = Input(shape=(config.es_max_seq_length,), dtype='int32')
+
+    # Pack it all up into a Manhattan Distance model
+    # distance = ManDist()([shared_model(left_input), shared_model(right_input)])
+    distance = Euclidean()([shared_model(left_input), shared_model(right_input)])
+
+    model = Model(inputs=[left_input, right_input], 
+                outputs=[distance])
+
+    # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
+    if config.gpus >= 2:
+        model = keras.utils.multi_gpu_model(model, gpus=config.gpus)
+
+    model.compile(loss='binary_crossentropy', 
+                optimizer=keras.optimizers.Adam(), 
+                metrics=['accuracy'])
     return model
 
 

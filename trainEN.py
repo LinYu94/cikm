@@ -17,6 +17,7 @@ from config import Config
 
 import gc
 from nltk.corpus import stopwords
+SAVE = False
 config = Config()
 
 
@@ -78,25 +79,45 @@ X_validation = split_and_zero_padding(X_validation, config.en_max_seq_length, ['
 
 
 
+
 # Save best, Early Stop
 early_stopping = EarlyStopping(monitor='val_loss', patience=5)
-model_checkpoint = ModelCheckpoint(config.en_bst_model_path, monitor='val_loss', save_best_only=True)
+model_checkpoint = ModelCheckpoint(config.en_bst_model_path, monitor='val_loss', save_best_only=True, save_weights_only=True)
 
-model = BuildENModel(embeddings, embedding_dim)
-# Start trainings
+
 training_start_time = time()
-malstm_trained = model.fit(X_train, Y_train,
-                           batch_size=config.batch_size, 
-                           epochs=config.n_epoch, 
-                           shuffle=True,
-                           verbose=2,
-                        #    callbacks=[model_checkpoint],
-                           validation_data=(X_validation, Y_validation)) # here do not early stop
+if SAVE:
+# Start trainings
+    model = BuildENModel(embeddings, embedding_dim)
+    model.summary()
+    malstm_trained = model.fit(X_train, Y_train,
+                            batch_size=config.batch_size, 
+                            epochs=config.n_epoch, 
+                            shuffle=True,
+                            verbose=2,
+                            callbacks=[model_checkpoint],
+                            validation_data=(X_validation, Y_validation)) # here do not early stop
+else:
+    model = BuildENModel_Test(embeddings, embedding_dim)
+    model.summary()
+    malstm_trained = model.fit(X_train, Y_train,
+                            batch_size=config.batch_size, 
+                            epochs=config.n_epoch, 
+                            shuffle=True,
+                            verbose=2,
+                            # callbacks=[model_checkpoint],
+                            validation_data=(X_validation, Y_validation)) # here do not early stop
 training_end_time = time()
 print("Training time finished.\n%d epochs in %12.2fs" % (config.n_epoch,
                                                         training_end_time - training_start_time))
-model.save(config.en_bst_model_path)
+# model.save(config.en_bst_model_path)
 
+
+# load_model = BuildENModel(embeddings, embedding_dim)
+# load_model.load_weights(config.en_bst_model_path)
+# load_model.summary()
+
+print('Done')
 # # Plot accuracy
 # plt.subplot(211)
 # plt.plot(malstm_trained.history['acc'])

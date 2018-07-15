@@ -8,7 +8,7 @@ from keras import initializers, regularizers, constraints
 from nltk.corpus import stopwords
 from gensim.models import KeyedVectors
 import tensorflow as tf
-from config import Config
+from config_dev import Config
 import gensim
 import keras
 from keras.models import Model, Sequential

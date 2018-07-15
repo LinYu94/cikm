@@ -13,7 +13,7 @@ import keras
 import tensorflow as tf
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from util import *
-from config import Config
+from config_dev import Config
 
 import gc
 from nltk.corpus import stopwords

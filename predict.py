@@ -4,7 +4,7 @@ import tensorflow as tf
 import keras
 from util import *
 import numpy as np
-from config import Config
+from config_dev import Config
 import gc
 
 config = Config()

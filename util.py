@@ -357,9 +357,11 @@ def BuildENModel_Test(embeddings, embedding_dim):
 
     # LSTM
     x.add(Bidirectional(LSTM(config.n_hidden,
+                            dropout=config.dropout_rate, 
+                            recurrent_dropout=config.dropout_rate,
                             return_sequences=True), name='en_encoder'))
     # x.add(Dropout(0.2))
-    x.add(Attention(config.en_max_seq_length))
+    x.add(Attention2(config.en_max_seq_length))
     shared_model = x
     
     # The visible layer

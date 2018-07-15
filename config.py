@@ -9,12 +9,12 @@ class Config(object):
         # self.version = '_test1'
         # Train data
         self.es_TrainFile = './data/cikm_spanish_train_20180516.txt'
-        self.es_embedding_wordFile = './data/wiki.es.vec_word_limit'
-        self.es_embedding_vecFile = './data/wiki.es.vec_vec_limit'
+        self.es_embedding_wordFile = './data/wiki.es.vec_word'
+        self.es_embedding_vecFile = './data/wiki.es.vec_vec'
         
         self.en_TrainFile = './data/cikm_english_train_20180516.txt'
-        self.en_embedding_wordFile = './data/wiki.en.vec_word_limit'
-        self.en_embedding_vecFile = './data/wiki.en.vec_vec_limit'
+        self.en_embedding_wordFile = './data/wiki.en.vec_word'
+        self.en_embedding_vecFile = './data/wiki.en.vec_vec'
 
         # Model variables
         self.n_epoch = 60

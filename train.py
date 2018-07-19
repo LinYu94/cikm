@@ -80,7 +80,7 @@ X_validation = split_and_zero_padding(X_validation, config.es_max_seq_length, co
 
 
 # Save best, Early Stop
-model_checkpoint = ModelCheckpoint(config.es_bst_model_path, monitor='val_loss', save_best_only=True)
+model_checkpoint = ModelCheckpoint(config.es_bst_model_path, monitor='val_loss', save_best_only=True, save_weights_only=True)
 
 
 

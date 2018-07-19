@@ -7,11 +7,11 @@ from keras.preprocessing.sequence import pad_sequences
 from nltk.corpus import stopwords
 from gensim.models import KeyedVectors
 import tensorflow as tf
-from config import Config
+from config_dev import Config
 import gensim
 import keras
 from keras.models import Model, Sequential
-from keras.layers import Input, Embedding, LSTM, GRU, Conv1D, Conv2D, GlobalMaxPool1D, Dense, Dropout, Bidirectional
+from keras.layers import Input, Embedding, LSTM, GRU, Conv1D, Conv2D, GlobalMaxPool1D, Dense, Dropout, Bidirectional, Lambda
 from keras.layers import BatchNormalization
 
 import numpy as np
@@ -19,6 +19,66 @@ import itertools
 import pandas as pd
 
 config = Config()
+
+def BuildESModel3(es_embeddings, es_embedding_dim, en_embeddings, en_embedding_dim):
+
+    # Define the shared model
+    es_encoder = Sequential()
+    es_encoder.add(Embedding(len(es_embeddings), es_embedding_dim,
+                    weights=[es_embeddings], 
+                    input_shape=(config.es_max_seq_length,),
+                    trainable=False))
+    
+    # LSTM
+    es_encoder.add(Bidirectional(LSTM(config.n_hidden,
+                            dropout=config.dropout_rate, 
+                            recurrent_dropout=config.dropout_rate), name='es_encoder'))
+
+    en_encoder = Sequential()
+    en_encoder.add(Embedding(len(en_embeddings), en_embedding_dim,
+                    weights=[en_embeddings], 
+                    input_shape=(config.en_max_seq_length,),
+                    trainable=False))
+    
+    # LSTM
+    en_encoder.add(Bidirectional(LSTM(config.n_hidden,
+                            dropout=config.dropout_rate, 
+                            recurrent_dropout=config.dropout_rate), name='en_encoder'))
+
+
+    # The visible layer
+    en1_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
+    en2_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
+
+    es1_input = Input(shape=(config.es_max_seq_length,), dtype='int32')
+    es2_input = Input(shape=(config.es_max_seq_length,), dtype='int32')
+
+    # Pack it all up into a distance methord
+    if config.distance == "ManDist":
+        ss_malstm_distance = Lambda(ManDist)([es_encoder(es1_input), es_encoder(es2_input)])
+        nn_malstm_distance = Lambda(ManDist)([en_encoder(en1_input), en_encoder(en2_input)])
+        s1n1_malstm_distance = Lambda(ManDist)([es_encoder(es1_input), en_encoder(en1_input)])
+        s2n2_malstm_distance = Lambda(ManDist)([es_encoder(es2_input), en_encoder(en2_input)])
+    elif config.distance == "Euclidean":
+        ss_malstm_distance = Lambda(Euclidean)([es_encoder(es1_input), es_encoder(es2_input)])
+        nn_malstm_distance = Lambda(Euclidean)([en_encoder(en1_input), en_encoder(en2_input)])
+        s1n1_malstm_distance = Lambda(Euclidean)([es_encoder(es1_input), en_encoder(en1_input)])
+        s2n2_malstm_distance = Lambda(Euclidean)([es_encoder(es2_input), en_encoder(en2_input)])
+    elif config.distance == "Cosine":
+        ss_malstm_distance = Lambda(Cosine)([es_encoder(es1_input), es_encoder(es2_input)])
+        nn_malstm_distance = Lambda(Cosine)([en_encoder(en1_input), en_encoder(en2_input)])
+        s1n1_malstm_distance = Lambda(Cosine)([es_encoder(es1_input), en_encoder(en1_input)])
+        s2n2_malstm_distance = Lambda(Cosine)([es_encoder(es2_input), en_encoder(en2_input)])
+
+    model = Model(inputs=[en1_input, en2_input, es1_input, es2_input], 
+                outputs=[ss_malstm_distance, nn_malstm_distance, s1n1_malstm_distance, s2n2_malstm_distance])
+
+    model.compile(loss='binary_crossentropy', 
+                  optimizer=keras.optimizers.Adam(),
+                  loss_weights=[1, 0.9, 0.9, 0.9],
+                  metrics=['accuracy'])
+    return model
+
 
 def BuildESModel(embeddings, embedding_dim):
     # --
@@ -280,9 +340,6 @@ class ManDist(Layer):
 
     # return output shape
     def compute_output_shape(self, input_shape):
-        print('heeheheheheheheheeehhhehehe')
-        print(self.result.shape)
-        print(K.int_shape(self.result))
         return K.int_shape(self.result)
 
 class Euclidean(Layer):
@@ -307,7 +364,16 @@ class Euclidean(Layer):
 
     # return output shape
     def compute_output_shape(self, input_shape):
-        print('heeheheheheheheheeehhhehehe')
-        print(self.result.shape)
-        print(K.int_shape(self.result))
         return K.int_shape(self.result)
+
+def ManDist(x):
+    return K.exp(-K.sum(K.abs(x[0] - x[1]), axis=1, keepdims=True))
+
+def Euclidean(x):
+    return K.exp(-K.sum((x[0]-x[1])**2, axis=1, keepdims=True))
+
+
+def Cosine(x):
+    norm_x0 = x[0] / K.sqrt(K.sum(x[0]**2, axis=1, keepdims=True))
+    norm_x1 = x[1] / K.sqrt(K.sum(x[1]**2, axis=1, keepdims=True))
+    return (1 + K.dot(norm_x0, K.transpose(norm_x1))) / 2

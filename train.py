@@ -102,16 +102,16 @@ print("Training time finished.\n%d epochs in %12.2f" % (config.n_epoch,
 # model.save(config.es_modelPath)
 
 # Plot accuracy
-plt.subplot(211)
-plt.plot(malstm_trained.history['acc'])
-plt.plot(malstm_trained.history['val_acc'])
-plt.title('Model Accuracy')
-plt.ylabel('Accuracy')
-plt.xlabel('Epoch')
-plt.legend(['Train', 'Validation'], loc='upper left')
+# plt.subplot(211)
+# plt.plot(malstm_trained.history['acc'])
+# plt.plot(malstm_trained.history['val_acc'])
+# plt.title('Model Accuracy')
+# plt.ylabel('Accuracy')
+# plt.xlabel('Epoch')
+# plt.legend(['Train', 'Validation'], loc='upper left')
 
 # Plot loss
-plt.subplot(212)
+plt.subplot(211)
 plt.plot(malstm_trained.history['loss'])
 plt.plot(malstm_trained.history['val_loss'])
 plt.title('Model Loss')

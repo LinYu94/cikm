@@ -70,7 +70,7 @@ def BuildESModel3(es_embeddings, es_embedding_dim, en_embeddings, en_embedding_d
         s1n1_malstm_distance = Lambda(Cosine)([es_encoder(es1_input), en_encoder(en1_input)])
         s2n2_malstm_distance = Lambda(Cosine)([es_encoder(es2_input), en_encoder(en2_input)])
 
-    model = Model(inputs=[en1_input, en2_input, es1_input, es2_input], 
+    model = Model(inputs=[es1_input, es2_input, en1_input, en2_input], 
                 outputs=[ss_malstm_distance, nn_malstm_distance, s1n1_malstm_distance, s2n2_malstm_distance])
 
     model.compile(loss='binary_crossentropy', 

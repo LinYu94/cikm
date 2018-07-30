@@ -13,7 +13,7 @@ import keras
 import tensorflow as tf
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from util import *
-from config import Config
+from config_dev import Config
 
 import gc
 from nltk.corpus import stopwords
@@ -80,7 +80,7 @@ X_validation = split_and_zero_padding(X_validation, config.en_max_seq_length, ['
 
 # Save best, Early Stop
 early_stopping = EarlyStopping(monitor='val_loss', patience=5)
-model_checkpoint = ModelCheckpoint(config.en_bst_model_path, monitor='val_loss', save_best_only=True)
+model_checkpoint = ModelCheckpoint(config.en_bst_model_path, monitor='val_loss', save_best_only=True, save_weights_only=True)
 
 model = BuildENModel(embeddings, embedding_dim)
 # Start trainings

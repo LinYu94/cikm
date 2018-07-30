@@ -27,7 +27,6 @@ config = Config()
 es_word_to_ix, es_embeddings, es_embedding_dim = LoadPretrainedEmbeddings(config.es_embedding_wordFile, config.es_embedding_vecFile)
 en_word_to_ix, en_embeddings, en_embedding_dim = LoadPretrainedEmbeddings(config.en_embedding_wordFile, config.en_embedding_vecFile)
 
-
 # Load training set1
 train_df1 = LoadTrainData2(config.es_TrainFile)
 train_df1.columns = ['es1', 'en1', 'es2', 'en2', 'sim']
@@ -60,12 +59,18 @@ train_df1 = train_df1[['es1_n', 'es2_n', 'en1_n', 'en2_n', 'sim']]
 train_df2 = train_df2[['es1_n', 'es2_n', 'en1_n', 'en2_n', 'sim']]
 
 
+train_df = pd.concat((train_df1, train_df2))
 
-# Split train set and validation set
-validation_df = train_df1
-train_df = train_df2
+# shuffle train data 
+train_df = shuffle(train_df)
 
-# gc.collect()
+# Split to train validation
+validation_size = int(len(train_df) * config.validation_ratio)
+training_size = len(train_df) - validation_size
+
+
+validation_df = train_df[:validation_size]
+train_df = train_df[validation_size:]
 
 
 X_train = train_df[['es1_n', 'es2_n', 'en1_n', 'en2_n']]
@@ -86,7 +91,7 @@ model_checkpoint = ModelCheckpoint(config.es_bst_model_path, monitor='val_loss',
 
 # Start trainings
 training_start_time = time()
-model = BuildESModel3(es_embeddings, es_embedding_dim, en_embeddings, en_embedding_dim)
+model = BuildESModel2(es_embeddings, es_embedding_dim, en_embeddings, en_embedding_dim)
 model.summary()
 malstm_trained = model.fit(X_train, [Y_train, Y_train, Y_train, Y_train],
                            batch_size=config.batch_size, 
@@ -111,17 +116,17 @@ print("Training time finished.\n%d epochs in %12.2f" % (config.n_epoch,
 # plt.legend(['Train', 'Validation'], loc='upper left')
 
 # Plot loss
-plt.subplot(211)
-plt.plot(malstm_trained.history['loss'])
-plt.plot(malstm_trained.history['val_loss'])
-plt.title('Model Loss')
-plt.ylabel('Loss')
-plt.xlabel('Epoch')
-plt.legend(['Train', 'Validation'], loc='upper right')
+# plt.subplot(211)
+# plt.plot(malstm_trained.history['loss'])
+# plt.plot(malstm_trained.history['val_loss'])
+# plt.title('Model Loss')
+# plt.ylabel('Loss')
+# plt.xlabel('Epoch')
+# plt.legend(['Train', 'Validation'], loc='upper right')
 
-plt.tight_layout(h_pad=1.0)
-plt.savefig(config.figurePath)
+# plt.tight_layout(h_pad=1.0)
+# plt.savefig(config.es_figurePath)
 
-print(str(malstm_trained.history['val_acc'][-1])[:6] +
-      "(max: " + str(max(malstm_trained.history['val_acc']))[:6] + ")")
+# print(str(malstm_trained.history['val_acc'][-1])[:6] +
+#       "(max: " + str(max(malstm_trained.history['val_acc']))[:6] + ")")
 print("Done.")

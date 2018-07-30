@@ -33,7 +33,7 @@ print(len(X_test))
 print(len(X_test[0]))
 # --
 
-model = BuildESModel3(es_embeddings, es_embedding_dim, en_embeddings, en_embedding_dim)
+model = BuildESModel2(es_embeddings, es_embedding_dim, en_embeddings, en_embedding_dim)
 model.load_weights(config.es_bst_model_path)
 
 

@@ -137,11 +137,12 @@ def BuildESModel(embeddings, embedding_dim):
     shared_model.summary()
     return model
 
-def BuildESModel2(embeddings, embedding_dim):
+def BuildESModel2(embeddings, embedding_dim, en_embeddings, en_embedding_dim):
     # --
     # Load EN model
     print('Loading EN encoder...: ', config.en_bst_model_path)
-    enModel = keras.models.load_model(config.en_bst_model_path, custom_objects={'ManDist': ManDist})
+    enModel = BuildENModel(en_embeddings, en_embedding_dim)
+    enModel.load_weights(config.en_bst_model_path)
     enEncoder = enModel.layers[2]
     print(enEncoder)
     # for layer in enEncoder.layers:
@@ -176,12 +177,14 @@ def BuildESModel2(embeddings, embedding_dim):
     # Pack it all up into a Manhattan Distance model
     # malstm_distance = ManDist()([shared_model(left_input), shared_model(right_input)])
 
-    ss_malstm_distance = ManDist()([shared_model(es_left_input), shared_model(es_right_input)])
-    s1n1_malstm_distance = ManDist()([shared_model(es_left_input), enEncoder(en_left_input)])
-    s2n2_malstm_distance = ManDist()([shared_model(es_right_input), enEncoder(en_right_input)])
+    ss_dis = Euclidean()([shared_model(es_left_input), shared_model(es_right_input)])
+    s1n1_dis = Euclidean()([shared_model(es_left_input), enEncoder(en_left_input)])
+    s2n2_dis = Euclidean()([shared_model(es_right_input), enEncoder(en_right_input)])
+    nn_dis = Euclidean()([shared_model(en_left_input), enEncoder(en_right_input)])
+
 
     model = Model(inputs=[es_left_input, es_right_input, en_left_input, en_right_input], 
-                outputs=[ss_malstm_distance, s1n1_malstm_distance, s2n2_malstm_distance])
+                outputs=[ss_dis, nn_dis, s1n1_dis, s2n2_dis])
 
     # `multi_gpu_model()` is a so quite buggy. it breaks the saved model.
     if config.gpus >= 2:
@@ -189,7 +192,7 @@ def BuildESModel2(embeddings, embedding_dim):
 
     model.compile(loss='binary_crossentropy', 
                   optimizer=keras.optimizers.Adam(),
-                  loss_weights=[1, 1, 1],
+                  loss_weights=[1, 1, 0.8, 0.8],
                   metrics=['accuracy'])
     model.summary()
     shared_model.summary()
@@ -216,8 +219,7 @@ def BuildENModel(embeddings, embedding_dim):
     right_input = Input(shape=(config.en_max_seq_length,), dtype='int32')
 
     # Pack it all up into a Manhattan Distance model
-    # distance = ManDist()([shared_model(left_input), shared_model(right_input)])
-    distance = ManDist()([shared_model(left_input), shared_model(right_input)])
+    distance = Euclidean()([shared_model(left_input), shared_model(right_input)])
 
     model = Model(inputs=[left_input, right_input], 
                 outputs=[distance])
@@ -365,15 +367,3 @@ class Euclidean(Layer):
     # return output shape
     def compute_output_shape(self, input_shape):
         return K.int_shape(self.result)
-
-def ManDist(x):
-    return K.exp(-K.sum(K.abs(x[0] - x[1]), axis=1, keepdims=True))
-
-def Euclidean(x):
-    return K.exp(-K.sum((x[0]-x[1])**2, axis=1, keepdims=True))
-
-
-def Cosine(x):
-    norm_x0 = x[0] / K.sqrt(K.sum(x[0]**2, axis=1, keepdims=True))
-    norm_x1 = x[1] / K.sqrt(K.sum(x[1]**2, axis=1, keepdims=True))
-    return (1 + K.dot(norm_x0, K.transpose(norm_x1))) / 2
